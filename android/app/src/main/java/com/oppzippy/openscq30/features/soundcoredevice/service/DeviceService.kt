@@ -261,10 +261,12 @@ class DeviceService : LifecycleService() {
         // Easy Chat: pause media when the earbuds report a session start, resume when it ends
         lifecycleScope.launch {
             connectionStatusFlow.collectLatest { connectionStatus ->
+                Log.d(TAG, "easy chat observer sees status $connectionStatus")
                 if (connectionStatus is ConnectionStatus.Connected) {
                     val controller = EasyChatMediaController(applicationContext)
                     val device = connectionStatus.deviceManager.device
                     connectionStatus.deviceManager.watchForChangeNotification.collectLatest {
+                        Log.d(TAG, "easy chat observer notified (tick=$it)")
                         controller.onDeviceStateChanged(device)
                     }
                 }

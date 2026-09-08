@@ -33,12 +33,12 @@ impl<T> ModuleCollection<T>
 where
     T: Has<EasyChatStatus> + Clone + Send + Sync,
 {
-    pub fn add_a3956_easy_chat_status(&mut self) {
+    pub fn add_a3956_easy_chat_status(&mut self, change_notify: watch::Sender<()>) {
         self.setting_manager
             .add_handler(CategoryId::Miscellaneous, EasyChatStatusSettingHandler);
         self.packet_handlers.set_handler(
             EasyChatEvent::COMMAND,
-            Box::new(EasyChatEventPacketHandler),
+            Box::new(EasyChatEventPacketHandler { change_notify }),
         );
     }
 }
@@ -84,8 +84,12 @@ where
     }
 }
 
-#[derive(Default)]
-struct EasyChatEventPacketHandler;
+/// Holds a `change_notify` sender for two reasons: to notify listeners when an Easy Chat
+/// event arrives, and, just as importantly, to keep the sender alive. Without a live sender
+/// the device's change watcher exits immediately and no state updates are ever delivered.
+struct EasyChatEventPacketHandler {
+    change_notify: watch::Sender<()>,
+}
 
 #[async_trait]
 impl<T> PacketHandler<T> for EasyChatEventPacketHandler
@@ -98,13 +102,15 @@ where
         packet: &packet::Inbound,
     ) -> device::Result<()> {
         let event: EasyChatEvent = packet.try_to_packet()?;
-        tracing::info!("easy chat event: active={}", event.is_active);
         state.send_if_modified(|state| {
             let status: &mut EasyChatStatus = state.get_mut();
             let modified = status.is_active != event.is_active;
             status.is_active = event.is_active;
             modified
         });
+        // Wake watch_for_changes directly; unsolicited events must reach the client.
+        let _ = self.change_notify.send(());
+        tracing::info!("easy chat event: active={}", event.is_active);
         Ok(())
     }
 }

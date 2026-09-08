@@ -36,6 +36,7 @@ class EasyChatMediaController(context: Context) {
             Log.w(TAG, "device was closed, ignoring state change", ex)
             return
         }
+        Log.d(TAG, "state changed, $SETTING_ID = $setting")
         // Devices without the setting are simply ignored
         if (setting !is Setting.InformationSetting) return
         onEasyChatActive(setting.value == ACTIVE_VALUE)
