@@ -22,3 +22,6 @@ local.properties
 /glue.rs.in
 keystore.properties
 .attach_pid*
+
+# signing key (never commit)
+*.jks
