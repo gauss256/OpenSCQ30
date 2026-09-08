@@ -1,7 +1,7 @@
 use nom::{
     IResult, Parser,
     bytes::complete::take,
-    combinator::map,
+    combinator::{all_consuming, map, verify},
     error::{ContextError, ParseError, context},
     multi::many0,
     number::complete::le_u8,
@@ -15,8 +15,9 @@ use crate::devices::soundcore::{
 /// Unsolicited event sent by the earbuds when an Easy Chat session starts (body `00 01`)
 /// or ends (body `00 00`). Observed on the Liberty 5 Pro; not known to be sent by other models.
 ///
-/// The body is two bytes. The first is always `00` (likely a sub-command or reserved index);
-/// the second is the active flag, so the flag is the last byte.
+/// The body is exactly two bytes. The first is always `00` (likely a sub-command or reserved
+/// index) and is accepted as-is; the second is the active flag and is only ever `00` or `01`.
+/// Any other length or flag value is rejected so an unexpected shape does not change state.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct EasyChatEvent {
     pub is_active: bool,
@@ -34,9 +35,10 @@ impl FromPacketBody for EasyChatEvent {
     ) -> IResult<&'a [u8], Self, E> {
         context(
             "a3956 easy chat event",
-            map((le_u8, le_u8), |(_reserved, flag)| Self {
-                is_active: flag != 0,
-            }),
+            all_consuming(map(
+                (le_u8, verify(le_u8, |flag| *flag <= 1)),
+                |(_reserved, flag)| Self { is_active: flag == 1 },
+            )),
         )
         .parse_complete(input)
     }
@@ -66,9 +68,13 @@ impl A3956StateUpdatePacket {
                 })
                 .unwrap_or_default()
         }
-        // Battery records are two bytes; the second is the percentage.
-        fn battery(bytes: Option<&[u8]>) -> u8 {
-            bytes.and_then(|b| b.last().copied()).unwrap_or_default()
+        // Battery records are two bytes; the percentage is the second. Any other shape is
+        // reported as unknown rather than a misleading value.
+        fn battery(bytes: Option<&[u8]>) -> Option<u8> {
+            match bytes {
+                Some([_, percent]) => Some(*percent),
+                _ => None,
+            }
         }
         A3956Info {
             serial_number: ascii(self.records.get(Self::TAG_SERIAL_NUMBER)),
@@ -97,9 +103,9 @@ impl FromPacketBody for A3956StateUpdatePacket {
     ) -> IResult<&'a [u8], Self, E> {
         context(
             "a3956 state update packet",
-            map(many0(take_tlv), |records| Self {
+            all_consuming(map(many0(take_tlv), |records| Self {
                 records: TlvRecords(records),
-            }),
+            })),
         )
         .parse_complete(input)
     }
@@ -151,8 +157,8 @@ pub mod tests {
         assert_eq!(info.serial_number, "0000000000000000");
         assert_eq!(info.firmware_left, "05.51");
         assert_eq!(info.firmware_right, "05.51");
-        assert_eq!(info.battery_left, 93);
-        assert_eq!(info.battery_right, 92);
+        assert_eq!(info.battery_left, Some(93));
+        assert_eq!(info.battery_right, Some(92));
         // round trip
         assert_eq!(packet.body(), body);
     }
@@ -164,5 +170,30 @@ pub mod tests {
         assert!(start.is_active);
         let (_, end) = EasyChatEvent::take::<VerboseError<_>>(&[0x00, 0x00]).unwrap();
         assert!(!end.is_active);
+    }
+
+    #[test]
+    fn rejects_malformed_easy_chat_event() {
+        // Too short, too long, and out-of-range flag must all fail rather than change state.
+        assert!(EasyChatEvent::take::<VerboseError<_>>(&[]).is_err());
+        assert!(EasyChatEvent::take::<VerboseError<_>>(&[0x00]).is_err());
+        assert!(EasyChatEvent::take::<VerboseError<_>>(&[0x00, 0x01, 0x00]).is_err());
+        assert!(EasyChatEvent::take::<VerboseError<_>>(&[0x00, 0xff]).is_err());
+    }
+
+    #[test]
+    fn rejects_truncated_state_packet() {
+        // A dangling tag with a length that runs past the end must fail, not parse a prefix.
+        assert!(A3956StateUpdatePacket::take::<VerboseError<_>>(&[0x03, 0x02, 0x00]).is_err());
+    }
+
+    #[test]
+    fn missing_battery_record_is_unknown() {
+        // Serial only, no battery tags.
+        let body = [0x07u8, 0x02, b'A', b'B'];
+        let (_, packet) = A3956StateUpdatePacket::take::<VerboseError<_>>(&body).unwrap();
+        let info = packet.info();
+        assert_eq!(info.battery_left, None);
+        assert_eq!(info.serial_number, "AB");
     }
 }

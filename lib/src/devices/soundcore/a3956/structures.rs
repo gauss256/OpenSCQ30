@@ -5,14 +5,16 @@ pub struct EasyChatStatus {
     pub is_active: bool,
 }
 
-/// Read-only information parsed from the A3956 TLV state packet.
+/// Read-only information parsed from the A3956 TLV state packet. Battery levels are
+/// `None` when the record is missing or not the expected shape, rather than a
+/// misleading 0%.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct A3956Info {
     pub serial_number: String,
     pub firmware_left: String,
     pub firmware_right: String,
-    pub battery_left: u8,
-    pub battery_right: u8,
+    pub battery_left: Option<u8>,
+    pub battery_right: Option<u8>,
 }
 
 /// The A3956 state packet is a sequence of tag/length/value records rather than the

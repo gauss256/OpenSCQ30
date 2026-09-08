@@ -41,6 +41,7 @@ import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 
 @OptIn(FlowPreview::class, ExperimentalCoroutinesApi::class)
@@ -203,6 +204,25 @@ class DeviceService : LifecycleService() {
         )
 
         createNotificationChannel()
+
+        // Easy Chat: pause media when the earbuds report a session start, resume when it ends.
+        // Installed once here (not in onStartCommand, which can run repeatedly) so only a single
+        // controller ever exists. The per-connection coroutineScope ties the controller's pending
+        // resume timer to the connection: a disconnect or a switch to another device cancels it,
+        // so a stale resume can never play into a different session.
+        lifecycleScope.launch {
+            connectionStatusFlow.collectLatest { connectionStatus ->
+                if (connectionStatus is ConnectionStatus.Connected) {
+                    coroutineScope {
+                        val controller = EasyChatMediaController(applicationContext, this)
+                        val device = connectionStatus.deviceManager.device
+                        connectionStatus.deviceManager.watchForChangeNotification.collectLatest {
+                            controller.onDeviceStateChanged(device)
+                        }
+                    }
+                }
+            }
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -254,18 +274,6 @@ class DeviceService : LifecycleService() {
                 if (it is ConnectionStatus.Connected) {
                     it.deviceManager.watchForChangeNotification.debounce(500.milliseconds).collectLatest {
                         sendNotification()
-                    }
-                }
-            }
-        }
-        // Easy Chat: pause media when the earbuds report a session start, resume when it ends
-        lifecycleScope.launch {
-            connectionStatusFlow.collectLatest { connectionStatus ->
-                if (connectionStatus is ConnectionStatus.Connected) {
-                    val controller = EasyChatMediaController(applicationContext, lifecycleScope)
-                    val device = connectionStatus.deviceManager.device
-                    connectionStatus.deviceManager.watchForChangeNotification.collectLatest {
-                        controller.onDeviceStateChanged(device)
                     }
                 }
             }

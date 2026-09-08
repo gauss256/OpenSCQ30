@@ -51,9 +51,12 @@ where
     fn get(&self, state: &T, setting_id: &SettingId) -> Option<Setting> {
         let info: &A3956Info = state.get();
         let setting: DeviceInfoSetting = (*setting_id).try_into().ok()?;
+        fn battery(level: Option<u8>) -> String {
+            level.map_or_else(|| "Unknown".to_owned(), |percent| format!("{percent}%"))
+        }
         let value = match setting {
-            DeviceInfoSetting::BatteryLevelLeft => format!("{}%", info.battery_left),
-            DeviceInfoSetting::BatteryLevelRight => format!("{}%", info.battery_right),
+            DeviceInfoSetting::BatteryLevelLeft => battery(info.battery_left),
+            DeviceInfoSetting::BatteryLevelRight => battery(info.battery_right),
             DeviceInfoSetting::FirmwareVersionLeft => info.firmware_left.clone(),
             DeviceInfoSetting::FirmwareVersionRight => info.firmware_right.clone(),
             DeviceInfoSetting::SerialNumber => info.serial_number.clone(),

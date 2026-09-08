@@ -26,7 +26,16 @@ import kotlinx.coroutines.launch
  * The buds send the "ended" event when voice detection closes, but they keep ducking and
  * transparency active for a short tail (about four seconds) before restoring the previous sound
  * mode. Resuming immediately would play into that tail, so resume is delayed by [resumeDelay] and
- * canceled if a new session starts first.
+ * canceled if a new session starts first. That delay is a calibrated fallback, not a guarantee that
+ * audio is audible again; resuming precisely on the earbuds' 0x0601 mode-restore packet is a
+ * possible future refinement.
+ *
+ * This is best-effort by design. It uses media key events and [AudioManager.isMusicActive] rather
+ * than owning a specific media session, so "we paused it" is an assumption: the pause and the later
+ * resume target whatever the system's current media app is, and manual pause/play during a session
+ * is not detected. This works well for the common case of one player on the earbuds. Owning a
+ * specific session (via a MediaSession / notification-listener) would make it robust across apps
+ * and manual intervention, at the cost of a heavier permission and design.
  */
 class EasyChatMediaController(
     context: Context,
