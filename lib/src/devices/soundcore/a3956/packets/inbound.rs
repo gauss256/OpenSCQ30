@@ -12,8 +12,11 @@ use crate::devices::soundcore::{
     common::packet::{self, Command, inbound::FromPacketBody, outbound::ToPacket},
 };
 
-/// Unsolicited event sent by the earbuds when an Easy Chat session starts (body `01`)
-/// or ends (body `00`). Observed on the Liberty 5 Pro; not known to be sent by other models.
+/// Unsolicited event sent by the earbuds when an Easy Chat session starts (body `00 01`)
+/// or ends (body `00 00`). Observed on the Liberty 5 Pro; not known to be sent by other models.
+///
+/// The body is two bytes. The first is always `00` (likely a sub-command or reserved index);
+/// the second is the active flag, so the flag is the last byte.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct EasyChatEvent {
     pub is_active: bool,
@@ -31,7 +34,7 @@ impl FromPacketBody for EasyChatEvent {
     ) -> IResult<&'a [u8], Self, E> {
         context(
             "a3956 easy chat event",
-            map(le_u8, |flag| Self {
+            map((le_u8, le_u8), |(_reserved, flag)| Self {
                 is_active: flag != 0,
             }),
         )
@@ -156,9 +159,10 @@ pub mod tests {
 
     #[test]
     fn parses_easy_chat_event() {
-        let (_, start) = EasyChatEvent::take::<VerboseError<_>>(&[0x01]).unwrap();
+        // Captured on the Liberty 5 Pro: start = 00 01, end = 00 00 (checksum already stripped).
+        let (_, start) = EasyChatEvent::take::<VerboseError<_>>(&[0x00, 0x01]).unwrap();
         assert!(start.is_active);
-        let (_, end) = EasyChatEvent::take::<VerboseError<_>>(&[0x00]).unwrap();
+        let (_, end) = EasyChatEvent::take::<VerboseError<_>>(&[0x00, 0x00]).unwrap();
         assert!(!end.is_active);
     }
 }
