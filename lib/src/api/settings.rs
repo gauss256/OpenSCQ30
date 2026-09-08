@@ -184,6 +184,7 @@ pub enum SettingId {
     Alarms,
     ListeningMode,
     DefaultListeningMode,
+    EasyChatActive,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

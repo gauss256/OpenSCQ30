@@ -31,6 +31,7 @@ soundcore-a3959 = Soundcore P30i / R50i NC
 soundcore-a3968 = Soundcore Sport X20
 soundcore-a3954 = Soundcore Liberty 4 Pro
 soundcore-a3955 = Soundcore P40i
+soundcore-a3956 = Soundcore Liberty 5 Pro
 soundcore-a3957 = Soundcore Liberty 5
 soundcore-d1101 = Soundcore C50i
 soundcore-d1202 = Soundcore P31i
@@ -253,6 +254,9 @@ x-standard-atmospheres = { $pressure } Atm
 
 easy-chat = Easy Chat
 easy-chat-wait-time = Easy Chat Wait Time
+easy-chat-active = Easy Chat Active
+easy-chat-active-yes = Active
+easy-chat-active-no = Idle
 
 volume-balance = Volume Balance
 

@@ -25,6 +25,7 @@ pub mod a3951;
 pub mod a3952;
 pub mod a3954;
 pub mod a3955;
+pub mod a3956;
 pub mod a3957;
 pub mod a3959;
 pub mod a3968;
