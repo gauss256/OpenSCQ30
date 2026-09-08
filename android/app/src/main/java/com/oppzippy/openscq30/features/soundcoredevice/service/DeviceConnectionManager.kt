@@ -23,7 +23,6 @@ class DeviceConnectionManager(val device: OpenScq30Device) : AutoCloseable {
         device.setWatchForChangesCallback(
             object : NotificationCallback {
                 override fun onNotify() {
-                    android.util.Log.d("DeviceConnectionManager", "onNotify from lib")
                     watchForChangeNotification.update { it + 1 }
                 }
             },
