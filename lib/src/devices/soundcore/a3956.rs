@@ -89,7 +89,7 @@ mod tests {
         .await;
 
         device.assert_setting_values([
-            (SettingId::SerialNumber, "1203007F1D22341E".into()),
+            (SettingId::SerialNumber, "0000000000000000".into()),
             (SettingId::FirmwareVersionLeft, "05.51".into()),
             (SettingId::FirmwareVersionRight, "05.51".into()),
             (SettingId::BatteryLevelLeft, "93%".into()),
